@@ -10,7 +10,7 @@ data = {
     "Risk": ["Low Risk", "Low Risk", "Low Risk", "Low Risk"],
     "Project Code": ["Project#1", "Project#1", "Project#1", "Project#1"],
     "Technology": ["SRAN", "5G", "MW", "CW"],
-    "Scope": ["New", "Swap", "Exp"],
+    "Scope": ["New", "New", "Swap", "Exp"],
     "Project Volume": [789, 999, 790, 555],
     "Project Duration": [10, 12, 5, 10]
 }
@@ -136,4 +136,5 @@ if st.button("Submit USER_INPUT"):
     st.success("✅ USER_INPUT submitted successfully!")
     st.write("Updated Full Table (including Risk & Market Unit):")
     st.dataframe(df)
+
 
