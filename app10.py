@@ -2,26 +2,41 @@ import streamlit as st
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries, get_column_letter
-import time
-import xlwings as xw
+import tempfile
+import requests
+import io
 
-excel_path = "https://github.com/vikramt07/PIP-SC_team_dimension/blob/main/PIP-SC_team_dimension%20-%20Copy.xlsx"
+st.title("PIP-SC Team Dimension Calculation — USER_INPUT (Cloud Version)")
 
-
-st.title("PIP-SC Team Dimension Calculation— USER_INPUT")
-
-# --- Editable USER_INPUT setup ---
+# --- Editable setup ---
 editable_columns = ["Country", "Project Code", "Scope", "Project Volume", "Project Duration"]
 dropdown_columns = ["Country", "Project Code", "Scope"]
 merge_titles = ["SRAN", "5G", "MW", "CW", "COMMON TEAM"]
 
-# --- Load dropdown options from Sheet4 ---
+# --- Use RAW GitHub link ---
+excel_url = "https://raw.githubusercontent.com/vikramt07/PIP-SC_team_dimension/main/PIP-SC_team_dimension%20-%20Copy.xlsx"
+
+# --- Load Excel into memory (since we can't write directly to GitHub) ---
+response = requests.get(excel_url)
+if response.status_code != 200:
+    st.error("❌ Could not download Excel file. Check the URL or repository access.")
+    st.stop()
+
+# Create temporary local copy
+temp_excel = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+temp_excel.write(response.content)
+temp_excel.flush()
+excel_path = temp_excel.name
+
+
+# --- Dropdown options from Sheet4 ---
 sheet4_df = pd.read_excel(excel_path, sheet_name="Sheet4")
 dropdown_options = {col: sheet4_df[col].dropna().unique().tolist() for col in dropdown_columns}
 
-# --- Initialize session state ---
+# --- Session state ---
 if "submitted" not in st.session_state:
     st.session_state.submitted = False
+
 
 # --- Load USER_INPUT table ---
 def load_user_table():
@@ -46,11 +61,13 @@ def load_user_table():
             df_user.columns = [str(c).strip() for c in df_user.columns]
             df_user = df_user.loc[:, ~df_user.columns.duplicated(keep="first")]
             df_user = df_user.fillna("")
-            # Convert numeric to whole numbers
+            # Convert numeric-looking cells
             for col in df_user.columns:
                 df_user[col] = df_user[col].map(lambda x: int(round(float(x))) if str(x).replace('.', '', 1).isdigit() else x)
             break
-    return df_user, ws, min_col, min_row
+    wb.close()
+    return df_user, min_col, min_row
+
 
 # --- Load other tables (read-only) ---
 def load_other_tables():
@@ -77,14 +94,16 @@ def load_other_tables():
                 )
                 df.columns = [str(c).strip() for c in df.columns]
                 df = df.fillna("")
-                # Convert numeric to whole numbers
                 for col in df.columns:
                     df[col] = df[col].map(lambda x: int(round(float(x))) if str(x).replace('.', '', 1).isdigit() else x)
                 all_tables[t] = df
+    wb.close()
     return all_tables
 
+
 # --- Render USER_INPUT ---
-df_user, ws_user, min_col, min_row = load_user_table()
+df_user, min_col, min_row = load_user_table()
+
 if df_user is None:
     st.warning("USER_INPUT table not found.")
 else:
@@ -101,10 +120,9 @@ else:
 
     if st.button("Submit USER_INPUT"):
         changed = False
-        wb = load_workbook(excel_path, data_only=False)  # keep formulas intact
+        wb = load_workbook(excel_path, data_only=False)
         ws = wb["Sheet1"]
 
-        # Write only edited cells in USER_INPUT
         for row_idx in range(len(df_user)):
             for col_name in editable_columns:
                 if col_name in df_user.columns:
@@ -117,30 +135,16 @@ else:
                         changed = True
 
         if changed:
-            # 1️⃣ Save user edits using openpyxl
             wb.save(excel_path)
-            wb.close()  # Close to release file lock
-
-            # 2️⃣ Recalculate formulas using xlwings
-            try:
-                xw_app = xw.App(visible=False)
-                xw_book = xw_app.books.open(excel_path)
-                xw_book.app.calculate()
-                xw_book.save()
-                xw_book.close()
-                xw_app.quit()
-                st.success("✅ USER_INPUT saved and recalculated successfully!")
-            except Exception as e:
-                st.warning(f"Formula recalculation skipped: {e}")
+            wb.close()
+            st.success("✅ USER_INPUT saved successfully (local copy only).")
         else:
             st.info("ℹ️ No changes detected.")
 
-
-        # Set flag to render other tables
         st.session_state.submitted = True
-        st.rerun()  # Stop current run; app reloads automatically
+        st.rerun()
 
-# --- Render other tables only after first submission ---
+# --- Render other tables ---
 if st.session_state.submitted:
     other_tables = load_other_tables()
     for name, df in other_tables.items():
@@ -168,6 +172,3 @@ if st.session_state.submitted:
         else:
             st.subheader(f"{name} Table")
             st.dataframe(df, width="stretch")
-
-
-
