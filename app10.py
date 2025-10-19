@@ -89,44 +89,39 @@ country_data = {
     "Palestine": {"Risk": "Very High", "Market Unit": "NA"},
 }
 
-# --- Columns that can be edited ---
+# --- Columns to show in the editable table ---
 editable_columns = ["Country", "Project Code", "Scope", "Project Volume", "Project Duration"]
 
 # --- Dropdown options ---
 dropdown_options = {
-    "Country": list(country_data.keys()),  # All countries
+    "Country": list(country_data.keys()),
     "Project Code": ["Project#1", "Project#2"],
     "Scope": ["New", "Swap", "Exp"]
 }
 
-# --- Streamlit column config ---
+# --- Column config for only editable columns ---
 column_config_dict = {}
-for col in df.columns:
+for col in editable_columns:
     if col in ["Country", "Project Code", "Scope"]:
         column_config_dict[col] = st.column_config.SelectboxColumn(
             label=col,
             options=dropdown_options[col]
         )
     elif col in ["Project Volume", "Project Duration"]:
-        column_config_dict[col] = st.column_config.NumberColumn(
-            label=col,
-            step=1
-        )
-    else:
-        column_config_dict[col] = st.column_config.Column(label=col, disabled=True)
+        column_config_dict[col] = st.column_config.NumberColumn(label=col, step=1)
 
-# --- Editable table ---
-edited_df = st.data_editor(df, column_config=column_config_dict, width="stretch")
+# --- Editable table (show only editable columns) ---
+edited_df = st.data_editor(df[editable_columns], column_config=column_config_dict, width="stretch")
 
-# --- Auto-update Risk & Market Unit based on Country ---
-for idx, row in edited_df.iterrows():
-    country = row["Country"]
+# --- Auto-update Risk & Market Unit in the full DataFrame ---
+for idx in edited_df.index:
+    country = edited_df.at[idx, "Country"]
     if country in country_data:
-        edited_df.at[idx, "Risk"] = country_data[country]["Risk"]
-        edited_df.at[idx, "Market Unit"] = country_data[country]["Market Unit"]
+        df.at[idx, "Risk"] = country_data[country]["Risk"]
+        df.at[idx, "Market Unit"] = country_data[country]["Market Unit"]
 
 # --- Submit button ---
 if st.button("Submit USER_INPUT"):
     st.success("✅ USER_INPUT submitted successfully!")
-    st.write("Updated Table:")
-    st.dataframe(edited_df)
+    st.write("Updated Full Table (including Risk & Market Unit):")
+    st.dataframe(df)
