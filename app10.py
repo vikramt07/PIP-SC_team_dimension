@@ -10,9 +10,9 @@ data = {
     "Risk": ["Low Risk", "Low Risk", "Low Risk", "Low Risk"],
     "Project Code": ["Project#1", "Project#1", "Project#1", "Project#1"],
     "Technology": ["SRAN", "5G", "MW", "CW"],
-    "Scope": ["New", "New", "Swap", "Exp"],
+    "Scope": ["New", "Swap", "Exp"],
     "Project Volume": [789, 999, 790, 555],
-    "Project Duration": [10, 12, 5, 10]
+    "Project Duration": [1,2,3,4,5,6,7,8,9,10,11,12]
 }
 
 df = pd.DataFrame(data)
@@ -51,3 +51,4 @@ if st.button("Submit USER_INPUT"):
     st.success("✅ USER_INPUT submitted successfully!")
     st.write("Updated Table:")
     st.dataframe(edited_df)
+
