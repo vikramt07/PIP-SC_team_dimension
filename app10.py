@@ -111,6 +111,7 @@ for col in editable_columns:
         column_config_dict[col] = st.column_config.SelectboxColumn(
             label=col,
             options=dropdown_options[col]
+        )
     elif col == "Scope":
     column_config_dict[col] = st.column_config.SelectboxColumn(
         label=col,
@@ -141,6 +142,7 @@ if st.button("Submit USER_INPUT"):
     st.success("✅ USER_INPUT submitted successfully!")
     st.write("Updated Full Table (including Risk & Market Unit):")
     st.dataframe(df)
+
 
 
 
