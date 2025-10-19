@@ -127,7 +127,7 @@ for col in editable_columns:
 edited_df = st.data_editor(df[editable_columns], column_config=column_config_dict, width="stretch")
 
 # --- Sync edited values back to full DataFrame ---
-for col in ["Country", "Project Code", "Project Volume", "Project Duration"]:
+for col in ["Country", "Project Code", "Scope", "Project Volume", "Project Duration"]:
     df[col] = edited_df[col]
 
 # --- Auto-update Risk & Market Unit in the full DataFrame ---
@@ -142,6 +142,7 @@ if st.button("Submit USER_INPUT"):
     st.success("✅ USER_INPUT submitted successfully!")
     st.write("Updated Full Table (including Risk & Market Unit):")
     st.dataframe(df)
+
 
 
 
