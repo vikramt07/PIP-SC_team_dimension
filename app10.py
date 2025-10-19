@@ -4,30 +4,38 @@ from openpyxl import load_workbook
 from openpyxl.utils import range_boundaries, get_column_letter
 import tempfile
 import requests
-import io
+import base64
+import json
+import os
 
-st.title("PIP-SC Team Dimension Calculation — USER_INPUT (Cloud Version)")
+# --- Repo details ---
+REPO = "vikramt07/PIP-SC_team_dimension"
+FILE_PATH = "PIP-SC_team_dimension - Copy.xlsx"
+BRANCH = "main"
+
+st.title("PIP-SC Team Dimension Calculation — Cloud + GitHub Save")
 
 # --- Editable setup ---
 editable_columns = ["Country", "Project Code", "Scope", "Project Volume", "Project Duration"]
 dropdown_columns = ["Country", "Project Code", "Scope"]
 merge_titles = ["SRAN", "5G", "MW", "CW", "COMMON TEAM"]
 
-# --- Use RAW GitHub link ---
-excel_url = "https://raw.githubusercontent.com/vikramt07/PIP-SC_team_dimension/main/PIP-SC_team_dimension%20-%20Copy.xlsx"
+# --- GitHub raw file URL ---
+RAW_URL = f"https://raw.githubusercontent.com/{REPO}/{BRANCH}/{FILE_PATH.replace(' ', '%20')}"
 
-# --- Load Excel into memory (since we can't write directly to GitHub) ---
-response = requests.get(excel_url)
-if response.status_code != 200:
-    st.error("❌ Could not download Excel file. Check the URL or repository access.")
-    st.stop()
+# --- Load Excel file into memory ---
+@st.cache_data(ttl=60)
+def load_excel():
+    r = requests.get(RAW_URL)
+    if r.status_code != 200:
+        st.error("❌ Could not load Excel from GitHub.")
+        st.stop()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    tmp.write(r.content)
+    tmp.flush()
+    return tmp.name
 
-# Create temporary local copy
-temp_excel = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-temp_excel.write(response.content)
-temp_excel.flush()
-excel_path = temp_excel.name
-
+excel_path = load_excel()
 
 # --- Dropdown options from Sheet4 ---
 sheet4_df = pd.read_excel(excel_path, sheet_name="Sheet4")
@@ -38,7 +46,7 @@ if "submitted" not in st.session_state:
     st.session_state.submitted = False
 
 
-# --- Load USER_INPUT table ---
+# --- Helper: Load USER_INPUT table ---
 def load_user_table():
     wb = load_workbook(excel_path, data_only=False)
     ws = wb["Sheet1"]
@@ -61,9 +69,6 @@ def load_user_table():
             df_user.columns = [str(c).strip() for c in df_user.columns]
             df_user = df_user.loc[:, ~df_user.columns.duplicated(keep="first")]
             df_user = df_user.fillna("")
-            # Convert numeric-looking cells
-            for col in df_user.columns:
-                df_user[col] = df_user[col].map(lambda x: int(round(float(x))) if str(x).replace('.', '', 1).isdigit() else x)
             break
     wb.close()
     return df_user, min_col, min_row
@@ -94,8 +99,6 @@ def load_other_tables():
                 )
                 df.columns = [str(c).strip() for c in df.columns]
                 df = df.fillna("")
-                for col in df.columns:
-                    df[col] = df[col].map(lambda x: int(round(float(x))) if str(x).replace('.', '', 1).isdigit() else x)
                 all_tables[t] = df
     wb.close()
     return all_tables
@@ -137,38 +140,45 @@ else:
         if changed:
             wb.save(excel_path)
             wb.close()
-            st.success("✅ USER_INPUT saved successfully (local copy only).")
+
+            # --- Upload back to GitHub ---
+            token = os.environ.get("GITHUB_TOKEN")
+            if not token:
+                st.error("❌ GitHub token missing. Add it in Streamlit secrets.")
+                st.stop()
+
+            # Get current file SHA (required for update)
+            url = f"https://api.github.com/repos/{REPO}/contents/{FILE_PATH}"
+            headers = {"Authorization": f"token {token}"}
+            get_resp = requests.get(url, headers=headers)
+            sha = get_resp.json().get("sha")
+
+            with open(excel_path, "rb") as f:
+                content = base64.b64encode(f.read()).decode()
+
+            payload = {
+                "message": "Update USER_INPUT from Streamlit app",
+                "content": content,
+                "branch": BRANCH,
+                "sha": sha
+            }
+            put_resp = requests.put(url, headers=headers, data=json.dumps(payload))
+
+            if put_resp.status_code in [200, 201]:
+                st.success("✅ Changes saved back to GitHub!")
+            else:
+                st.error(f"⚠️ Failed to save: {put_resp.json()}")
+
         else:
             st.info("ℹ️ No changes detected.")
 
         st.session_state.submitted = True
         st.rerun()
 
+
 # --- Render other tables ---
 if st.session_state.submitted:
     other_tables = load_other_tables()
     for name, df in other_tables.items():
-        if name.upper() == "TEAM_DIMENSION":
-            st.subheader("TEAM_DIMENSION Table")
-            num_cols = len(df.columns)
-            html_table = "<table style='width:100%; border-collapse:collapse; text-align:center;' border='1'>"
-            for _, row in df.iterrows():
-                first_cell = str(row[df.columns[0]]).strip()
-                if first_cell in merge_titles:
-                    html_table += f"""
-                        <tr style='background-color:#0E1117; color:white; font-weight:bold;'>
-                            <td colspan='{num_cols}' style='text-align:center; font-size:15px; padding:6px;'>
-                                {first_cell}
-                            </td>
-                        </tr>
-                    """
-                else:
-                    html_table += "<tr>"
-                    for col in df.columns:
-                        html_table += f"<td>{row[col]}</td>"
-                    html_table += "</tr>"
-            html_table += "</table>"
-            st.markdown(html_table, unsafe_allow_html=True)
-        else:
-            st.subheader(f"{name} Table")
-            st.dataframe(df, width="stretch")
+        st.subheader(f"{name} Table")
+        st.dataframe(df, width="stretch")
