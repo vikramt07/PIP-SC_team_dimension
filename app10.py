@@ -5,7 +5,7 @@ from openpyxl.utils import range_boundaries, get_column_letter
 import time
 import xlwings as xw
 
-excel_path = r"C:\Users\vikrt\Desktop\Project_Matrixs\PIP-SC_team_dimension - Copy.xlsx"
+excel_path = PIP-SC_team_dimension - Copy.xlsx
 
 st.title("PIP-SC Team Dimension Calculation— USER_INPUT")
 
@@ -167,3 +167,4 @@ if st.session_state.submitted:
         else:
             st.subheader(f"{name} Table")
             st.dataframe(df, width="stretch")
+
