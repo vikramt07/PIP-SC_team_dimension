@@ -111,7 +111,7 @@ for col in editable_columns:
             label=col,
             options=dropdown_options[col]
         )
-    elif col == ""Technology"":
+    elif col == "Technology":
         # Show Scope but make it read-only
         column_config_dict[col] = st.column_config.Column(label=col, disabled=True)
     elif col in ["Project Volume", "Project Duration"]:
@@ -136,6 +136,7 @@ if st.button("Submit USER_INPUT"):
     st.success("✅ USER_INPUT submitted successfully!")
     st.write("Updated Full Table (including Risk & Market Unit):")
     st.dataframe(df)
+
 
 
 
