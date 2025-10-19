@@ -1,152 +1,169 @@
 import streamlit as st
 import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.utils import range_boundaries, get_column_letter
+import time
+import xlwings as xw
 
-st.title("USER_INPUT Table")
+excel_path = r"C:\Users\vikrt\Desktop\Project_Matrixs\PIP-SC_team_dimension - Copy.xlsx"
 
-# --- Sample data ---
-data = {
-    "Market Unit": ["Saudi", "ME", "ME", "ME"],
-    "Country": ["Oman", "UAE", "UAE", "UAE"],
-    "Risk": ["Low Risk", "Low Risk", "Low Risk", "Low Risk"],
-    "Project Code": ["Project#1", "Project#1", "Project#1", "Project#1"],
-    "Technology": ["SRAN", "5G", "MW", "CW"],
-    "Scope": ["New", "New", "Swap", "Exp"],
-    "Project Volume": [789, 999, 790, 555],
-    "Project Duration": [10, 12, 5, 10]
-}
+st.title("PIP-SC Team Dimension Calculation— USER_INPUT")
 
-df = pd.DataFrame(data)
+# --- Editable USER_INPUT setup ---
+editable_columns = ["Country", "Project Code", "Scope", "Project Volume", "Project Duration"]
+dropdown_columns = ["Country", "Project Code", "Scope"]
+merge_titles = ["SRAN", "5G", "MW", "CW", "COMMON TEAM"]
 
-# --- Country mapping for Risk & Market Unit ---
-country_data = {
-    "UAE": {"Risk": "Low Risk", "Market Unit": "ME"},
-    "Qatar": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Oman": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Saudi Bahrain": {"Risk": "Low Risk", "Market Unit": "CEWA"},
-    "Rwanda": {"Risk": "Low Risk", "Market Unit": "SAV"},
-    "Jordan": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Moroco": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Saudi Arabia": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Maurtitus": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Kuwait": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Senegal": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Egypt": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Namibia": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Tunisia": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Alegria": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Madagascar": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Cyshell": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Comoros": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Cape Verdi": {"Risk": "Low Risk", "Market Unit": "NA"},
-    "Kenya": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Ghana": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Zambia": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Uganda": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Lebanon": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Tanzania": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Ethiopia": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Cameron": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Pakistan": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Muaritania": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Eriteria": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Dijibouti": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Congo": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Gabon": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Benin": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Equatorial Guniea": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Togo": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Cote D'ivoir": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Liberia": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Sierraleone": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Guniea": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Guniea Bissau": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Gambia": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Malawi": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Mozambique": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Zimbabwe": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Botswana": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Eswatini": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Lesoto": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "South Africa": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Angola": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Burundi": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Western Sahara": {"Risk": "Medium Risk", "Market Unit": "NA"},
-    "Nigeria": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Libya": {"Risk": "High Risk", "Market Unit": "NA"},
-    "South Sudan": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Somalia": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Central Africa": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Mali": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Burkina Faso": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Congo DRC": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Chad": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Niger": {"Risk": "High Risk", "Market Unit": "NA"},
-    "Syria": {"Risk": "Very High", "Market Unit": "NA"},
-    "Yamen": {"Risk": "Very High", "Market Unit": "NA"},
-    "Sudan": {"Risk": "Very High", "Market Unit": "NA"},
-    "Iraq": {"Risk": "Very High", "Market Unit": "NA"},
-    "Iran": {"Risk": "Very High", "Market Unit": "NA"},
-    "Palestine": {"Risk": "Very High", "Market Unit": "NA"},
-}
+# --- Load dropdown options from Sheet4 ---
+sheet4_df = pd.read_excel(excel_path, sheet_name="Sheet4")
+dropdown_options = {col: sheet4_df[col].dropna().unique().tolist() for col in dropdown_columns}
 
-# --- Columns to show in the editable table ---
-editable_columns = ["Country", "Project Code", "Technology", "Scope","Project Volume", "Project Duration"]
+# --- Initialize session state ---
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
 
-# --- Dropdown options ---
-dropdown_options = {
-    "Country": list(country_data.keys()),
-    "Project Code": ["Project#1", "Project#2"],
-    "Scope": ["New", "Swap", "Exp"],
-}
+# --- Load USER_INPUT table ---
+def load_user_table():
+    wb = load_workbook(excel_path, data_only=False)
+    ws = wb["Sheet1"]
+    df_user = None
+    min_col = min_row = 0
+    for t in ws.tables:
+        if t == "USER_INPUT":
+            tbl_obj = ws.tables[t]
+            min_col, min_row, max_col, max_row = range_boundaries(tbl_obj.ref)
+            usecols = f"{get_column_letter(min_col)}:{get_column_letter(max_col)}"
+            nrows = max_row - min_row + 1
+            df_user = pd.read_excel(
+                excel_path,
+                sheet_name=ws.title,
+                header=0,
+                usecols=usecols,
+                skiprows=min_row - 1,
+                nrows=nrows
+            )
+            df_user.columns = [str(c).strip() for c in df_user.columns]
+            df_user = df_user.loc[:, ~df_user.columns.duplicated(keep="first")]
+            df_user = df_user.fillna("")
+            # Convert numeric to whole numbers
+            for col in df_user.columns:
+                df_user[col] = df_user[col].map(lambda x: int(round(float(x))) if str(x).replace('.', '', 1).isdigit() else x)
+            break
+    return df_user, ws, min_col, min_row
 
-# --- Column config ---
-column_config_dict = {}
-for col in editable_columns:
-    if col == "Country":
-        column_config_dict[col] = st.column_config.SelectboxColumn(
-            label=col,
-            options=dropdown_options[col]
-        )
-    elif col == "Project Code":
-        column_config_dict[col] = st.column_config.SelectboxColumn(
-            label=col,
-            options=dropdown_options[col]
-        )
-    elif col == "Scope":
-        column_config_dict[col] = st.column_config.SelectboxColumn(
-            label=col,
-            options=dropdown_options[col]
-        )
-    elif col == "Technology":
-        # Show Scope but make it read-only
-        column_config_dict[col] = st.column_config.Column(label=col, disabled=True)
-    elif col in ["Project Volume", "Project Duration"]:
-        column_config_dict[col] = st.column_config.NumberColumn(label=col, step=1)
+# --- Load other tables (read-only) ---
+def load_other_tables():
+    wb = load_workbook(excel_path, data_only=False)
+    all_tables = {}
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        for t in ws.tables:
+            if t != "USER_INPUT":
+                tbl_obj = ws.tables[t]
+                ref = getattr(tbl_obj, "ref", None)
+                if not ref:
+                    continue
+                min_col, min_row, max_col, max_row = range_boundaries(ref)
+                usecols = f"{get_column_letter(min_col)}:{get_column_letter(max_col)}"
+                nrows = max_row - (min_row - 1)
+                df = pd.read_excel(
+                    excel_path,
+                    sheet_name=sheet_name,
+                    header=0,
+                    usecols=usecols,
+                    skiprows=min_row - 1,
+                    nrows=nrows
+                )
+                df.columns = [str(c).strip() for c in df.columns]
+                df = df.fillna("")
+                # Convert numeric to whole numbers
+                for col in df.columns:
+                    df[col] = df[col].map(lambda x: int(round(float(x))) if str(x).replace('.', '', 1).isdigit() else x)
+                all_tables[t] = df
+    return all_tables
 
-# --- Editable table ---
-edited_df = st.data_editor(df[editable_columns], column_config=column_config_dict, width="stretch")
+# --- Render USER_INPUT ---
+df_user, ws_user, min_col, min_row = load_user_table()
+if df_user is None:
+    st.warning("USER_INPUT table not found.")
+else:
+    column_config_dict = {}
+    for col in df_user.columns:
+        if col in dropdown_columns:
+            column_config_dict[col] = st.column_config.SelectboxColumn(label=col, options=dropdown_options[col])
+        elif col in ["Project Volume", "Project Duration"]:
+            column_config_dict[col] = st.column_config.NumberColumn(label=col, step=1)
+        else:
+            column_config_dict[col] = st.column_config.Column(label=col, disabled=True)
 
-# --- Sync edited values back to full DataFrame ---
-for col in ["Country", "Project Code", "Scope", "Project Volume", "Project Duration"]:
-    df[col] = edited_df[col]
+    edited_df = st.data_editor(df_user, column_config=column_config_dict, width="stretch")
 
-# --- Auto-update Risk & Market Unit in the full DataFrame ---
-for idx in df.index:
-    country = df.at[idx, "Country"]
-    if country in country_data:
-        df.at[idx, "Risk"] = country_data[country]["Risk"]
-        df.at[idx, "Market Unit"] = country_data[country]["Market Unit"]
+    if st.button("Submit USER_INPUT"):
+        changed = False
+        wb = load_workbook(excel_path, data_only=False)  # keep formulas intact
+        ws = wb["Sheet1"]
 
-# --- Submit button ---
-if st.button("Submit USER_INPUT"):
-    st.success("✅ USER_INPUT submitted successfully!")
-    st.write("Updated Full Table (including Risk & Market Unit):")
-    st.dataframe(df)
+        # Write only edited cells in USER_INPUT
+        for row_idx in range(len(df_user)):
+            for col_name in editable_columns:
+                if col_name in df_user.columns:
+                    old_val = df_user.at[row_idx, col_name]
+                    new_val = edited_df.at[row_idx, col_name]
+                    if old_val != new_val:
+                        excel_col_idx = df_user.columns.get_loc(col_name) + min_col
+                        excel_row_idx = min_row + row_idx + 1
+                        ws.cell(row=excel_row_idx, column=excel_col_idx, value=new_val)
+                        changed = True
+
+        if changed:
+            # 1️⃣ Save user edits using openpyxl
+            wb.save(excel_path)
+            wb.close()  # Close to release file lock
+
+            # 2️⃣ Recalculate formulas using xlwings
+            try:
+                xw_app = xw.App(visible=False)
+                xw_book = xw_app.books.open(excel_path)
+                xw_book.app.calculate()
+                xw_book.save()
+                xw_book.close()
+                xw_app.quit()
+                st.success("✅ USER_INPUT saved and recalculated successfully!")
+            except Exception as e:
+                st.warning(f"Formula recalculation skipped: {e}")
+        else:
+            st.info("ℹ️ No changes detected.")
 
 
+        # Set flag to render other tables
+        st.session_state.submitted = True
+        st.rerun()  # Stop current run; app reloads automatically
 
-
-
-
-
-
+# --- Render other tables only after first submission ---
+if st.session_state.submitted:
+    other_tables = load_other_tables()
+    for name, df in other_tables.items():
+        if name.upper() == "TEAM_DIMENSION":
+            st.subheader("TEAM_DIMENSION Table")
+            num_cols = len(df.columns)
+            html_table = "<table style='width:100%; border-collapse:collapse; text-align:center;' border='1'>"
+            for _, row in df.iterrows():
+                first_cell = str(row[df.columns[0]]).strip()
+                if first_cell in merge_titles:
+                    html_table += f"""
+                        <tr style='background-color:#0E1117; color:white; font-weight:bold;'>
+                            <td colspan='{num_cols}' style='text-align:center; font-size:15px; padding:6px;'>
+                                {first_cell}
+                            </td>
+                        </tr>
+                    """
+                else:
+                    html_table += "<tr>"
+                    for col in df.columns:
+                        html_table += f"<td>{row[col]}</td>"
+                    html_table += "</tr>"
+            html_table += "</table>"
+            st.markdown(html_table, unsafe_allow_html=True)
+        else:
+            st.subheader(f"{name} Table")
+            st.dataframe(df, width="stretch")
